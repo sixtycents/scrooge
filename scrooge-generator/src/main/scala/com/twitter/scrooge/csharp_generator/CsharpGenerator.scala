@@ -171,6 +171,49 @@ class CsharpGenerator(
     }
   }
 
+  def typeNameOption(
+    f: Field,
+    inContainer: Boolean = false,
+    inInit: Boolean = false,
+    skipGeneric: Boolean = false
+  ): String = {
+
+    val baseType: String = f.fieldType match {
+      case TBool => if (inContainer) "bool" else "bool"
+      case TByte => if (inContainer) "byte" else "byte"
+      case TI16 => if (inContainer) "short" else "short"
+      case TI32 => if (inContainer) "int" else "int"
+      case TI64 => if (inContainer) "long" else "long"
+      case TDouble => if (inContainer) "double" else "double"
+      case TString => "string"
+      case TBinary => "byte[]"
+      case n: NamedType => qualifyNamedType(n.sid, n.scopePrefix).fullName
+      case MapType(k, v, _) =>
+        val prefix = if (inInit) "Dictionary" else "IDictionary"
+        prefix + (if (skipGeneric) "" else "<" + typeName(k, inContainer = true) + "," + typeName(v, inContainer = true) + ">")
+      case SetType(x, _) =>
+        val prefix = if (inInit)
+          x match {
+            case e:EnumType => "EnumSet"
+            case _ => "HashSet"
+          }
+        else "ISet"
+        prefix + (if (skipGeneric) "" else "<" + typeName(x, inContainer = true) + ">")
+      case ListType(x, _) =>
+        val prefix = if (inInit) "List" else "IList"
+        prefix + (if (skipGeneric) "" else "<" + typeName(x, inContainer = true) + ">")
+      case r: ReferenceType =>
+        throw new ScroogeInternalException("ReferenceType should not appear in backend")
+      case _ => throw new ScroogeInternalException("unknown type: " + f.fieldType)
+    }
+
+    if (f.requiredness.isOptional) {
+      "Option<" + baseType + ">"
+    } else {
+      baseType
+    }
+  }
+
   def initField(
     fieldType: FunctionType,
     inContainer: Boolean = false
