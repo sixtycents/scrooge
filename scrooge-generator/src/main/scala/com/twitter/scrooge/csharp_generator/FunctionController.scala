@@ -13,7 +13,7 @@ class FunctionController(function: TFunction, generator: CsharpGenerator, ns: Op
     a.sid.name
   } mkString ", "
   val argument_list_with_types = function.args map { a =>
-    generator.typeName(a.fieldType) + " " + a.sid.name
+    generator.typeNameOption(a.fieldType) + " " + a.sid.name
   } mkString ", "
   val argument_list_with_args = function.args map { a =>
     "args." + a.sid.name.capitalize
@@ -49,8 +49,8 @@ class FunctionController(function: TFunction, generator: CsharpGenerator, ns: Op
 
   def arg_struct = {
     val args = function.args map { a =>
-      val requiredness = if (a.requiredness.isRequired) Requiredness.Required else Requiredness.Default
-      Field(a.index, a.sid, a.originalName, a.fieldType, a.default, requiredness)
+      //val requiredness = if (a.requiredness.isRequired) Requiredness.Required else Requiredness.Default
+      Field(a.index, a.sid, a.originalName, a.fieldType, a.default, a.requiredness)
     }
     val structName = function.funcName.name.capitalize + "_args"
     val struct = Struct(SimpleID(structName), structName, args, function.docstring, Map.empty)
