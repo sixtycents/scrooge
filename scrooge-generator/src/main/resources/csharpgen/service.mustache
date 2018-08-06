@@ -195,7 +195,7 @@
                         {{#is_oneway}}
                         await iface.{{name}}Async({{{argument_list_with_args}}}); 
                         // todo: __stats_{{name}}.SuccessCounter.incr() ;
-                        return new byte[0]; // todo: cache
+                        return Unpooled.Empty; // todo: cache
                         {{/is_oneway}}
 
                         {{^is_oneway}}
