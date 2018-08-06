@@ -16,31 +16,41 @@
 
         public partial class ServiceToClient{{#extends_iface}} : {{name}}.ServiceToClient, {{/extends_iface}}{{^extends_iface}} : {{/extends_iface}}ServiceIface
         {
-            readonly Finagle.Core.Service<ThriftClientRequest, byte[]> service;
-            readonly TProtocolFactory protocolFactory;
+            {{^extends_iface}}
+            protected readonly Finagle.Core.Service<ThriftClientRequest, IByteBuffer> service;
+            protected readonly TProtocolFactory protocolFactory;
+            protected readonly IByteBufferAllocator allocator;
+            {{/extends_iface}}
             {{^is_oneway}}
             readonly Finagle.Core.Services.ResponseClassifier responseClassifier;
 
-            public ServiceToClient(Finagle.Core.Service<ThriftClientRequest, byte[]> service, TProtocolFactory protocolFactory, Finagle.Core.Services.ResponseClassifier responseClassifier){{#extends_iface}} : base(service, protocolFactory, responseClassifier){{/extends_iface}}
+            public ServiceToClient(Finagle.Core.Service<ThriftClientRequest, IByteBuffer> service, TProtocolFactory protocolFactory, Finagle.Core.Services.ResponseClassifier responseClassifier, IByteBufferAllocator allocator)
+                {{#extends_iface}} : base(service, protocolFactory, responseClassifier, allocator){{/extends_iface}}
             {
+                {{^extends_iface}}
                 this.service = service;
                 this.protocolFactory = protocolFactory;
                 this.responseClassifier = responseClassifier;
+                this.allocator = allocator;
+                {{/extends_iface}}
             }
             {{/is_oneway}}
 
-            public ServiceToClient(Finagle.Core.Service<ThriftClientRequest, byte[]> service, TProtocolFactory protocolFactory) {{#extends_iface}}: base(service, protocolFactory, Finagle.Core.Services.ResponseClassifier.Default){{/extends_iface}}
+            public ServiceToClient(Finagle.Core.Service<ThriftClientRequest, IByteBuffer> service, TProtocolFactory protocolFactory, IByteBufferAllocator allocator) {{#extends_iface}}: base(service, protocolFactory, Finagle.Core.Services.ResponseClassifier.Default, allocator){{/extends_iface}}
             {
+                {{^extends_iface}}
                 this.service = service;
                 this.protocolFactory = protocolFactory;
+                this.allocator = allocator;
                 {{^is_oneway}}this.responseClassifier = Finagle.Core.Services.ResponseClassifier.Default;{{/is_oneway}}
+                {{/extends_iface}}
             }
 
             {{^extends_iface}}
-            protected T DecodeResponse<T>(byte[] resBytes, ThriftStructCodec3<T> codec)
+            protected T DecodeResponse<T>(IByteBuffer resBytes, ThriftStructCodec3<T> codec)
                 where T : IThriftStruct
             {
-                var iprot = this.protocolFactory.GetProtocol(new TMemoryInputTransport(resBytes));
+                var iprot = this.protocolFactory.GetProtocol(new TBufferInputTransport(resBytes));
                 var msg = iprot.ReadMessageBegin();
                 try
                 {
@@ -51,6 +61,7 @@
                 finally
                 {
                     iprot.ReadMessageEnd();
+                    iprot.Dispose();
                 }
             }
             {{/extends_iface}}
@@ -61,7 +72,7 @@
             public async Task{{^is_oneway_or_void}}<{{{return_type.type_name_in_container}}}>{{/is_oneway_or_void}} {{name}}Async({{{argument_list_with_types}}})
             {
                 // TODO: size
-                TMemoryBuffer __memoryTransport__ = new TMemoryBuffer();
+                TByteBufferTransport __memoryTransport__ = new TByteBufferTransport(this.allocator);
                 TProtocol __prot__ = this.protocolFactory.GetProtocol(__memoryTransport__);
                 __prot__.WriteMessageBegin(new TMessage("{{name}}", TMessageType.Call, 0));
                 {{name}}_args __args__ = new {{name}}_args();
@@ -72,7 +83,7 @@
                 __prot__.WriteMessageEnd();
 
 
-                byte[] __buffer__ = __memoryTransport__.GetBuffer();
+                IByteBuffer __buffer__ = __memoryTransport__.GetBuffer();
                 ThriftClientRequest __request__ = new ThriftClientRequest(__buffer__, {{#is_oneway}}true{{/is_oneway}}{{^is_oneway}}false{{/is_oneway}});
                 {{^is_oneway_or_void}}
                 var serdeCtx = new DeserializeCtx<{{{return_type.type_name}}}>(__args__, buf => Decode{{name}}Response(buf));
@@ -104,7 +115,7 @@
             }
             {{^is_oneway_or_void}}
 
-            Finagle.Core.Util.Try<{{{return_type.type_name}}}> Decode{{name}}Response(byte[] response)
+            Finagle.Core.Util.Try<{{{return_type.type_name}}}> Decode{{name}}Response(IByteBuffer response)
             {
                 try
                 {
@@ -129,16 +140,16 @@
             {{/functions}}
         }
 
-        public partial class Service {{#extends_iface}}: {{name}}.Service{{/extends_iface}}{{^extends_iface}}: Finagle.Core.Service<byte[], byte[]>{{/extends_iface}}
+        public partial class Service {{#extends_iface}}: {{name}}.Service{{/extends_iface}}{{^extends_iface}}: Finagle.Core.Service<IByteBuffer, IByteBuffer>{{/extends_iface}}
         {
             readonly ServiceIface iface;
             readonly TProtocolFactory protocolFactory;
 
             {{^extends_iface}}
-            protected IDictionary<string, Func<TProtocol, int, Task<byte[]>>> functionMap = new Dictionary<string, Func<TProtocol, int, Task<byte[]>>>();
+            protected IDictionary<string, Func<TProtocol, int, Task<IByteBuffer>>> functionMap = new Dictionary<string, Func<TProtocol, int, Task<IByteBuffer>>>();
             {{/extends_iface}}
 
-            byte[] CreateException(string name, int seqid, TApplicationException.ExceptionType code, string message)
+            IByteBuffer CreateException(string name, int seqid, TApplicationException.ExceptionType code, string message)
             {
                 TApplicationException x = new TApplicationException(code, message);
                 TMemoryBuffer memoryBuffer = new TMemoryBuffer();
@@ -148,7 +159,7 @@
                 x.Write(oprot);
                 oprot.WriteMessageEnd();
                 oprot.Transport.Flush();
-                byte[] buffer = memoryBuffer.GetBuffer();
+                IByteBuffer buffer = memoryBuffer.GetBuffer();
                 return buffer;
             }
 
@@ -171,7 +182,11 @@
                         iprot.ReadMessageEnd();
                         return CreateException("{{name}}", seqid, TApplicationException.ExceptionType.ProtocolError, e.Message);
                     }
-
+                    finally
+                    {
+                        iprot.Dispose();
+                    }
+                    
                     try
                     {
                         {{#is_oneway}}
@@ -220,7 +235,7 @@
                 {{/functions}}
             }
 
-            public override Task<byte[]> Invoke(byte[] request)
+            public override Task<IByteBuffer> Invoke(IByteBuffer request)
             {
                 TTransport inputTransport = new TMemoryInputTransport(request);
                 TProtocol iprot = this.protocolFactory.GetProtocol(inputTransport);
@@ -232,10 +247,10 @@
                 }
                 catch (Exception e)
                 {
-                    return TaskEx.FromException<byte[]>(e);
+                    return TaskEx.FromException<IByteBuffer>(e);
                 }
 
-                Func<TProtocol, int, Task<byte[]>> fn;
+                Func<TProtocol, int, Task<IByteBuffer>> fn;
                 bool success = this.functionMap.TryGetValue(msg.Name, out fn);
                 if (fn == null)
                 {
@@ -254,7 +269,7 @@
                     }
                     catch (Exception e)
                     {
-                        return TaskEx.FromException<byte[]>(e);
+                        return TaskEx.FromException<IByteBuffer>(e);
                     }
                 }
 
