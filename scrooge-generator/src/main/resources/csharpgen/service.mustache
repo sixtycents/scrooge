@@ -144,15 +144,15 @@
         {
             readonly ServiceIface iface;
             readonly TProtocolFactory protocolFactory;
-
             {{^extends_iface}}
+            protected readonly IByteBufferAllocator allocator;
             protected IDictionary<string, Func<TProtocol, int, Task<IByteBuffer>>> functionMap = new Dictionary<string, Func<TProtocol, int, Task<IByteBuffer>>>();
             {{/extends_iface}}
 
             IByteBuffer CreateException(string name, int seqid, TApplicationException.ExceptionType code, string message)
             {
                 TApplicationException x = new TApplicationException(code, message);
-                TMemoryBuffer memoryBuffer = new TMemoryBuffer();
+                TMemoryBuffer memoryBuffer = new TByteBufferTransport(this.allocator);
                 TProtocol oprot = this.protocolFactory.GetProtocol(memoryBuffer);
 
                 oprot.WriteMessageBegin(new TMessage(name, TMessageType.Exception, seqid));
@@ -163,10 +163,13 @@
                 return buffer;
             }
 
-            public Service(ServiceIface iface, TProtocolFactory protocolFactory){{#extends_iface}} : base(iface, protocolFactory){{/extends_iface}}
+            public Service(ServiceIface iface, TProtocolFactory protocolFactory, IByteBufferAllocator allocator){{#extends_iface}} : base(iface, protocolFactory, allocator){{/extends_iface}}
             {
                 this.iface = iface;
                 this.protocolFactory = protocolFactory;
+                {{#extends_iface}}
+                this.allocator = allocator;
+                {{/extends_iface}}
                 {{#functions}}
                 this.functionMap.Add("{{name}}", async (iprot, seqid) =>
                 {
