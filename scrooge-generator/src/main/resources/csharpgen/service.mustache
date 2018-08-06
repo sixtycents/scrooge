@@ -240,7 +240,7 @@
 
             public override Task<IByteBuffer> Invoke(IByteBuffer request)
             {
-                TTransport inputTransport = new TMemoryInputTransport(request);
+                TTransport inputTransport = new TBufferInputTransport(request);
                 TProtocol iprot = this.protocolFactory.GetProtocol(inputTransport);
 
                 TMessage msg;
