@@ -262,7 +262,7 @@
                         TProtocolUtil.Skip(iprot, TType.Struct);
                         iprot.ReadMessageEnd();
                         TApplicationException x = new TApplicationException(TApplicationException.ExceptionType.UnknownMethod, "Invalid method name: '" + msg.Name + "'");
-                        TMemoryBuffer memoryBuffer = new TMemoryBuffer();
+                        TByteBufferTransport memoryBuffer = new TByteBufferTransport(this.allocator);
                         TProtocol oprot = this.protocolFactory.GetProtocol(memoryBuffer);
                         oprot.WriteMessageBegin(new TMessage(msg.Name, TMessageType.Exception, msg.SeqID));
                         x.Write(oprot);
