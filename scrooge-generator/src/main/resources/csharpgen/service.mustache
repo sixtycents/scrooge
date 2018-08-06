@@ -152,7 +152,7 @@
             IByteBuffer CreateException(string name, int seqid, TApplicationException.ExceptionType code, string message)
             {
                 TApplicationException x = new TApplicationException(code, message);
-                TMemoryBuffer memoryBuffer = new TByteBufferTransport(this.allocator);
+                TByteBufferTransport memoryBuffer = new TByteBufferTransport(this.allocator);
                 TProtocol oprot = this.protocolFactory.GetProtocol(memoryBuffer);
 
                 oprot.WriteMessageBegin(new TMessage(name, TMessageType.Exception, seqid));
