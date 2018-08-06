@@ -167,7 +167,7 @@
             {
                 this.iface = iface;
                 this.protocolFactory = protocolFactory;
-                {{#extends_iface}}
+                {{^extends_iface}}
                 this.allocator = allocator;
                 {{/extends_iface}}
                 {{#functions}}
