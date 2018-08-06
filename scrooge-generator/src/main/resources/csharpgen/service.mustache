@@ -216,7 +216,7 @@
                         {{/exceptions}}
                         {{/exceptions.length}}
 
-                        TMemoryBuffer memoryBuffer = new TMemoryBuffer();
+                        TByteBufferTransport memoryBuffer = new TByteBufferTransport(this.allocator);
                         TProtocol oprot = protocolFactory.GetProtocol(memoryBuffer);
 
                         oprot.WriteMessageBegin(new TMessage("{{name}}", TMessageType.Reply, seqid));
