@@ -13,7 +13,7 @@ class FunctionController(function: TFunction, generator: CsharpGenerator, ns: Op
     a.sid.name
   } mkString ", "
   val argument_list_with_types = function.args map { a =>
-    generator.typeNameOption(a.fieldType) + " " + a.sid.name
+    generator.typeNameOption(a) + " " + a.sid.name
   } mkString ", "
   val argument_list_with_args = function.args map { a =>
     "args." + a.sid.name.capitalize
