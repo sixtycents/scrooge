@@ -243,7 +243,7 @@
                     {
                         TProtocolUtil.Skip(iprot, TType.Struct);
                         iprot.ReadMessageEnd();
-                        TApplicationException x = new TApplicationException(TApplicationException.ExceptionType.UnknownMethod, "Invalid method name: '"+msg.Name+"'");
+                        TApplicationException x = new TApplicationException(TApplicationException.ExceptionType.UnknownMethod, "Invalid method name: '"+msg.Name+"'" + " in " + typeof(Service).FullName);
                         TMemoryBuffer memoryBuffer = new TMemoryBuffer();
                         TProtocol oprot = this.protocolFactory.GetProtocol(memoryBuffer);
                         oprot.WriteMessageBegin(new TMessage(msg.Name, TMessageType.Exception, msg.SeqID));
