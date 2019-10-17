@@ -150,7 +150,7 @@
                 return buffer;
             }
 
-            public Service(ServiceIface inner, TProtocolFactory protocolFactory){{#extends_iface}} : base(iface, protocolFactory){{/extends_iface}}
+            public Service(ServiceIface inner, TProtocolFactory protocolFactory){{#extends_iface}} : base(inner, protocolFactory){{/extends_iface}}
             {
                 {{^extends_iface}}
                 this.inner = inner;
