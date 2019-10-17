@@ -132,7 +132,7 @@
         public partial class Service {{#extends_iface}}: {{name}}.Service{{/extends_iface}}{{^extends_iface}}: Finagle.Core.Service<byte[], byte[]>{{/extends_iface}}
         {
             {{^extends_iface}}
-            protected readonly ServiceIface iface;
+            protected readonly ServiceIface inner;
             protected readonly TProtocolFactory protocolFactory;
             {{/extends_iface}}
 
@@ -150,13 +150,15 @@
                 return buffer;
             }
 
-            public Service(ServiceIface iface, TProtocolFactory protocolFactory){{#extends_iface}} : base(iface, protocolFactory){{/extends_iface}}
+            public Service(ServiceIface inner, TProtocolFactory protocolFactory){{#extends_iface}} : base(iface, protocolFactory){{/extends_iface}}
             {
                 {{^extends_iface}}
-                this.iface = iface;
+                this.inner = inner;
                 this.protocolFactory = protocolFactory;
                 {{/extends_iface}}
             }
+
+            ServiceIface Inner => (ServiceIface)this.inner;
 
             public override Task<byte[]> Invoke(byte[] request)
             {
@@ -173,16 +175,10 @@
                     return TaskEx.FromException<byte[]>(e);
                 }
 
-                Func<TProtocol, int, Task<byte[]>> fn;
-                bool success = this.functionMap.TryGetValue(msg.Name, out fn);
-                if (fn == null)
-                {
-                }
-
-                return fn.Invoke(iprot, msg.SeqID);
+                return this.ProcessMessageAsync(iprot, msg);
             }
 
-            protected Task<byte[]> ProcessMessageAsync(TProtocol iprot, TMessage msg)
+            protected {{#extends_iface}}new {{/extends_iface}}Task<byte[]> ProcessMessageAsync(TProtocol iprot, TMessage msg)
             {
                 switch (msg.Name) {
                     {{#functions}}
@@ -190,7 +186,7 @@
                     {{/functions}}
                     default:
                         {{#extends_iface}}
-                        return base.ProcessMessage(msg);
+                        return base.ProcessMessageAsync(iprot, msg);
                         {{/extends_iface}}
                         {{^extends_iface}}
                         try
@@ -233,7 +229,7 @@
                 try
                 {
                     {{#is_oneway}}
-                    await iface.{{name}}Async({{{argument_list_with_args}}}); 
+                    await this.Inner.{{name}}Async({{{argument_list_with_args}}}); 
                     // todo: __stats_{{name}}.SuccessCounter.incr() ;
                     return new byte[0]; // todo: cache
                     {{/is_oneway}}
@@ -244,7 +240,7 @@
                     try
                     {
                     {{/exceptions.length}}
-                    var value = await iface.{{name}}Async({{{argument_list_with_args}}});
+                    var value = await this.Inner.{{name}}Async({{{argument_list_with_args}}});
                     result.Success = Option.Some(value);
                     {{#exceptions.length}}
                     }
@@ -257,7 +253,7 @@
                     {{/exceptions.length}}
 
                     TMemoryBuffer memoryBuffer = new TMemoryBuffer();
-                    TProtocol oprot = protocolFactory.GetProtocol(memoryBuffer);
+                    TProtocol oprot = this.protocolFactory.GetProtocol(memoryBuffer);
 
                     oprot.WriteMessageBegin(new TMessage("{{name}}", TMessageType.Reply, seqid));
                     result.Write(oprot);
