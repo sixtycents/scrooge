@@ -131,11 +131,9 @@
 
         public partial class Service {{#extends_iface}}: {{name}}.Service{{/extends_iface}}{{^extends_iface}}: Finagle.Core.Service<byte[], byte[]>{{/extends_iface}}
         {
-            readonly ServiceIface iface;
-            readonly TProtocolFactory protocolFactory;
-
             {{^extends_iface}}
-            protected IDictionary<string, Func<TProtocol, int, Task<byte[]>>> functionMap = new Dictionary<string, Func<TProtocol, int, Task<byte[]>>>();
+            protected readonly ServiceIface iface;
+            protected readonly TProtocolFactory protocolFactory;
             {{/extends_iface}}
 
             byte[] CreateException(string name, int seqid, TApplicationException.ExceptionType code, string message)
@@ -154,70 +152,10 @@
 
             public Service(ServiceIface iface, TProtocolFactory protocolFactory){{#extends_iface}} : base(iface, protocolFactory){{/extends_iface}}
             {
+                {{^extends_iface}}
                 this.iface = iface;
                 this.protocolFactory = protocolFactory;
-                {{#functions}}
-                this.functionMap.Add("{{name}}", async (iprot, seqid) =>
-                {
-                    //todo: __stats_{{name}}.RequestsCounter.incr()
-                    {{name}}_args args;
-                    try
-                    {
-                        args = {{name}}_args.Codec.Decode(iprot);
-                        iprot.ReadMessageEnd();
-                    }
-                    catch (TProtocolException e)
-                    {
-                        iprot.ReadMessageEnd();
-                        return CreateException("{{name}}", seqid, TApplicationException.ExceptionType.ProtocolError, e.Message);
-                    }
-
-                    try
-                    {
-                        {{#is_oneway}}
-                        await iface.{{name}}Async({{{argument_list_with_args}}}); 
-                        // todo: __stats_{{name}}.SuccessCounter.incr() ;
-                        return new byte[0]; // todo: cache
-                        {{/is_oneway}}
-
-                        {{^is_oneway}}
-                        var result = new {{name}}_result();
-                        {{#exceptions.length}}
-                        try
-                        {
-                        {{/exceptions.length}}
-                        var value = await iface.{{name}}Async({{{argument_list_with_args}}});
-                        result.Success = Option.Some(value);
-                        {{#exceptions.length}}
-                        }
-                        {{#exceptions}}
-                        catch ({{{field_type.type_name}}} e)
-                        {
-                            result.{{#cap}}{{name}}{{/cap}} = Option.Some(e);
-                        }
-                        {{/exceptions}}
-                        {{/exceptions.length}}
-
-                        TMemoryBuffer memoryBuffer = new TMemoryBuffer();
-                        TProtocol oprot = protocolFactory.GetProtocol(memoryBuffer);
-
-                        oprot.WriteMessageBegin(new TMessage("{{name}}", TMessageType.Reply, seqid));
-                        result.Write(oprot);
-                        oprot.WriteMessageEnd();
-
-                        // todo: __stats_{{name}}.SuccessCounter.incr();
-                        return memoryBuffer.GetBuffer();
-                        {{/is_oneway}}
-                    }
-                    catch (Exception e)
-                    {
-                        // todo:
-                        // __stats_{{name}}.FailuresCounter.incr();
-                        // __stats_{{name}}.FailuresScope.counter(Throwables.mkString(ex): _*).incr();
-                        throw;
-                    }
-                });
-                {{/functions}}
+                {{/extends_iface}}
             }
 
             public override Task<byte[]> Invoke(byte[] request)
@@ -239,27 +177,105 @@
                 bool success = this.functionMap.TryGetValue(msg.Name, out fn);
                 if (fn == null)
                 {
-                    try
-                    {
-                        TProtocolUtil.Skip(iprot, TType.Struct);
-                        iprot.ReadMessageEnd();
-                        TApplicationException x = new TApplicationException(TApplicationException.ExceptionType.UnknownMethod, "Invalid method name: '"+msg.Name+"'" + " in " + typeof(Service).FullName);
-                        TMemoryBuffer memoryBuffer = new TMemoryBuffer();
-                        TProtocol oprot = this.protocolFactory.GetProtocol(memoryBuffer);
-                        oprot.WriteMessageBegin(new TMessage(msg.Name, TMessageType.Exception, msg.SeqID));
-                        x.Write(oprot);
-                        oprot.WriteMessageEnd();
-                        oprot.Transport.Flush();
-                        return Task.FromResult(memoryBuffer.GetBuffer());
-                    }
-                    catch (Exception e)
-                    {
-                        return TaskEx.FromException<byte[]>(e);
-                    }
                 }
 
                 return fn.Invoke(iprot, msg.SeqID);
             }
+
+            protected Task<byte[]> ProcessMessageAsync(TProtocol iprot, TMessage msg)
+            {
+                switch (msg.Name) {
+                    {{#functions}}
+                    case "{{name}}": return this.__{{name}}Async(iprot, msg.SeqID);
+                    {{/functions}}
+                    default:
+                        {{#extends_iface}}
+                        return base.ProcessMessage(msg);
+                        {{/extends_iface}}
+                        {{^extends_iface}}
+                        try
+                        {
+                            TProtocolUtil.Skip(iprot, TType.Struct);
+                            iprot.ReadMessageEnd();
+                            TApplicationException x = new TApplicationException(TApplicationException.ExceptionType.UnknownMethod, "Invalid method name: '"+msg.Name+"'" + " in " + typeof(Service).FullName);
+                            TMemoryBuffer memoryBuffer = new TMemoryBuffer();
+                            TProtocol oprot = this.protocolFactory.GetProtocol(memoryBuffer);
+                            oprot.WriteMessageBegin(new TMessage(msg.Name, TMessageType.Exception, msg.SeqID));
+                            x.Write(oprot);
+                            oprot.WriteMessageEnd();
+                            oprot.Transport.Flush();
+                            return Task.FromResult(memoryBuffer.GetBuffer());
+                        }
+                        catch (Exception e)
+                        {
+                            return TaskEx.FromException<byte[]>(e);
+                        }
+                        {{/extends_iface}}
+                }
+            }
+
+            {{#functions}}
+            async Task<byte[]> __{{name}}Async(TProtocol iprot, int seqid)
+            {
+                //todo: __stats_{{name}}.RequestsCounter.incr()
+                {{name}}_args args;
+                try
+                {
+                    args = {{name}}_args.Codec.Decode(iprot);
+                    iprot.ReadMessageEnd();
+                }
+                catch (TProtocolException e)
+                {
+                    iprot.ReadMessageEnd();
+                    return CreateException("{{name}}", seqid, TApplicationException.ExceptionType.ProtocolError, e.Message);
+                }
+
+                try
+                {
+                    {{#is_oneway}}
+                    await iface.{{name}}Async({{{argument_list_with_args}}}); 
+                    // todo: __stats_{{name}}.SuccessCounter.incr() ;
+                    return new byte[0]; // todo: cache
+                    {{/is_oneway}}
+
+                    {{^is_oneway}}
+                    var result = new {{name}}_result();
+                    {{#exceptions.length}}
+                    try
+                    {
+                    {{/exceptions.length}}
+                    var value = await iface.{{name}}Async({{{argument_list_with_args}}});
+                    result.Success = Option.Some(value);
+                    {{#exceptions.length}}
+                    }
+                    {{#exceptions}}
+                    catch ({{{field_type.type_name}}} e)
+                    {
+                        result.{{#cap}}{{name}}{{/cap}} = Option.Some(e);
+                    }
+                    {{/exceptions}}
+                    {{/exceptions.length}}
+
+                    TMemoryBuffer memoryBuffer = new TMemoryBuffer();
+                    TProtocol oprot = protocolFactory.GetProtocol(memoryBuffer);
+
+                    oprot.WriteMessageBegin(new TMessage("{{name}}", TMessageType.Reply, seqid));
+                    result.Write(oprot);
+                    oprot.WriteMessageEnd();
+
+                    // todo: __stats_{{name}}.SuccessCounter.incr();
+                    return memoryBuffer.GetBuffer();
+                    {{/is_oneway}}
+                }
+                catch (Exception e)
+                {
+                    // todo:
+                    // __stats_{{name}}.FailuresCounter.incr();
+                    // __stats_{{name}}.FailuresScope.counter(Throwables.mkString(ex): _*).incr();
+                    throw;
+                }
+            }
+            {{/functions}}
         }
 
         {{#functions}}
