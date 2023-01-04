@@ -164,7 +164,12 @@ public {{#is_final}}sealed {{/is_final}} partial class {{name}} : {{#is_exceptio
         oprot.WriteStructBegin(ThriftCodec.STRUCT_DESC);
         {{#sorted_fields}}
         {{#field_type.nullable}}
+        {{#field.optional}}
+        if (this.{{name}}.HasValue)
+        {{/field.optional}}
+        {{^field.optional}}
         if (this.{{name}} != null)
+        {{/field.optional}}
         {
             {{/field_type.nullable}}
 
